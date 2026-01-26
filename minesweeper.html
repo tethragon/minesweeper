@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minesweeper - Ναρκαλιευτής v2</title>
+    <style>
+        :root {
+            --bg-color: #f0f0f0;
+            --board-bg: #bdbdbd;
+            --cell-bg: #c6c6c6;
+            --cell-shadow-light: #fff;
+            --cell-shadow-dark: #7b7b7b;
+            --revealed-bg: #d1d1d1;
+            --progress-color: #4CAF50; /* Το αρχικό πράσινο χρώμα */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            margin: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        h1 { margin-bottom: 10px; color: #333; }
+
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        select, button {
+            padding: 8px 12px;
+            font-size: 16px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            font-weight: bold;
+        }
+
+        button:hover { background-color: #45a049; }
+
+        /* Panel Info & Progress */
+        .game-stats {
+            width: 100%;
+            max-width: 450px;
+            margin-bottom: 10px;
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        /* Progress Bar Styles */
+        .progress-container {
+            width: 100%;
+            background-color: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 20px;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: var(--progress-color);
+            transition: width 0.3s ease, background-color 0.3s ease; /* Προστέθηκε animation και για το χρώμα */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: #333;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        /* Board Styles */
+        #game-board {
+            display: grid;
+            background-color: var(--board-bg);
+            padding: 10px;
+            border-top: 3px solid var(--cell-shadow-light);
+            border-left: 3px solid var(--cell-shadow-light);
+            border-right: 3px solid var(--cell-shadow-dark);
+            border-bottom: 3px solid var(--cell-shadow-dark);
+            gap: 0; 
+        }
+
+        .cell {
+            width: 30px;
+            height: 30px;
+            background-color: var(--cell-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 20px;
+            box-sizing: border-box;
+            border-top: 3px solid var(--cell-shadow-light);
+            border-left: 3px solid var(--cell-shadow-light);
+            border-right: 3px solid var(--cell-shadow-dark);
+            border-bottom: 3px solid var(--cell-shadow-dark);
+        }
+
+        .cell.revealed {
+            background-color: var(--revealed-bg);
+            border: 1px solid #7b7b7b;
+            width: 30px;
+            height: 30px;
+        }
+
+        .cell.mine { background-color: #e74c3c; }
+        .cell.flag { color: red; }
+        .cell.question { color: #2196F3; }
+
+        .c1 { color: blue; }
+        .c2 { color: green; }
+        .c3 { color: red; }
+        .c4 { color: darkblue; }
+        .c5 { color: darkred; }
+        .c6 { color: teal; }
+        .c7 { color: black; }
+        .c8 { color: gray; }
+
+    </style>
+</head>
+<body>
+
+    <h1>💣 Ναρκαλιευτής</h1>
+
+    <div class="controls">
+        <select id="difficulty">
+            <option value="easy">Εύκολο (9x9)</option>
+            <option value="medium">Μεσαίο (16x16)</option>
+            <option value="hard">Δύσκολο (16x30)</option>
+        </select>
+        <button onclick="startGame()">Επανεκκίνηση 😊</button>
+    </div>
+
+    <div class="game-stats">
+        <div class="info-panel">
+            <div>🚩 Νάρκες: <span id="mines-count">10</span></div>
+            <div>⏱️ Χρόνος: <span id="timer">0</span></div>
+        </div>
+        
+        <div class="progress-section">
+            <div class="progress-text">Πρόοδος: <span id="progress-text-val">0 / 0</span></div>
+            <div class="progress-container">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-board" oncontextmenu="return false;"></div>
+
+    <script>
+        const boardElement = document.getElementById('game-board');
+        const minesCountElement = document.getElementById('mines-count');
+        const timerElement = document.getElementById('timer');
+        const difficultySelect = document.getElementById('difficulty');
+        
+        // Στοιχεία Progress Bar
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text-val');
+
+        let grid = [];
+        let config = {};
+        let timer;
+        let timeElapsed = 0;
+        let isGameOver = false;
+        let firstClick = true;
+        let flagsPlaced = 0;
+        let totalSafeCells = 0;
+
+        const difficulties = {
+            easy: { rows: 9, cols: 9, mines: 10 },
+            medium: { rows: 16, cols: 16, mines: 40 },
+            hard: { rows: 16, cols: 30, mines: 99 }
+        };
+
+        // --- ΝΕΟ: Event Listener για αλλαγή δυσκολίας ---
+        // Όταν ο χρήστης αλλάζει την επιλογή, αποθηκεύουμε και επανεκκινούμε αυτόματα
+        difficultySelect.addEventListener('change', () => {
+            const selectedLevel = difficultySelect.value;
+            localStorage.setItem('minesweeper-level', selectedLevel); // Αποθήκευση στο LocalStorage
+            startGame();
+        });
+
+        function startGame() {
+            clearInterval(timer);
+            timeElapsed = 0;
+            timerElement.innerText = 0;
+            isGameOver = false;
+            firstClick = true;
+            flagsPlaced = 0;
+            grid = [];
+            boardElement.innerHTML = '';
+
+            // --- ΔΙΟΡΘΩΣΗ: Reset Progress Bar ---
+            progressBar.style.width = '0%';
+            // Επαναφορά του χρώματος στο κενό (ώστε να πάρει το default από το CSS ή να το ορίσουμε ρητά)
+            progressBar.style.backgroundColor = ''; 
+            
+            const level = difficultySelect.value;
+            config = difficulties[level];
+            minesCountElement.innerText = config.mines;
+
+            // Υπολογισμός στόχου
+            totalSafeCells = (config.rows * config.cols) - config.mines;
+            progressText.innerText = `0 / ${totalSafeCells}`;
+
+            boardElement.style.gridTemplateColumns = `repeat(${config.cols}, 30px)`;
+
+            for (let r = 0; r < config.rows; r++) {
+                grid[r] = [];
+                for (let c = 0; c < config.cols; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    
+                    cell.addEventListener('click', () => {
+                        handleClick(r, c);
+                    });
+
+                    cell.addEventListener('contextmenu', (e) => {
+                        e.preventDefault(); 
+                        handleRightClick(r, c);
+                    });
+
+                    boardElement.appendChild(cell);
+                    
+                    grid[r][c] = {
+                        element: cell,
+                        isMine: false,
+                        revealed: false,
+                        flagged: 0, 
+                        neighborMines: 0
+                    };
+                }
+            }
+        }
+
+        function placeMines(excludeRow, excludeCol) {
+            let minesPlaced = 0;
+            while (minesPlaced < config.mines) {
+                let r = Math.floor(Math.random() * config.rows);
+                let c = Math.floor(Math.random() * config.cols);
+
+                if (!grid[r][c].isMine && (r !== excludeRow || c !== excludeCol)) {
+                    grid[r][c].isMine = true;
+                    minesPlaced++;
+                }
+            }
+            calculateNeighbors();
+        }
+
+        function calculateNeighbors() {
+            for (let r = 0; r < config.rows; r++) {
+                for (let c = 0; c < config.cols; c++) {
+                    if (grid[r][c].isMine) continue;
+                    let count = 0;
+                    for (let i = -1; i <= 1; i++) {
+                        for (let j = -1; j <= 1; j++) {
+                            const nr = r + i;
+                            const nc = c + j;
+                            if (nr >= 0 && nr < config.rows && nc >= 0 && nc < config.cols) {
+                                if (grid[nr][nc].isMine) count++;
+                            }
+                        }
+                    }
+                    grid[r][c].neighborMines = count;
+                }
+            }
+        }
+
+        function handleClick(r, c) {
+            if (isGameOver) return;
+            if (grid[r][c].flagged === 1 || grid[r][c].revealed) return;
+
+            if (firstClick) {
+                firstClick = false;
+                placeMines(r, c);
+                startTimer();
+            }
+
+            const cellData = grid[r][c];
+
+            if (cellData.isMine) {
+                gameOver(false);
+            } else {
+                revealCell(r, c);
+                updateProgress();
+            }
+        }
+
+        function handleRightClick(r, c) {
+            if (isGameOver || grid[r][c].revealed) return;
+
+            const cellData = grid[r][c];
+            const cellEl = cellData.element;
+
+            if (cellData.flagged === 0) {
+                cellData.flagged = 1;
+                cellEl.innerText = '🚩';
+                cellEl.classList.add('flag');
+                flagsPlaced++;
+            } else if (cellData.flagged === 1) {
+                cellData.flagged = 2;
+                cellEl.innerText = '❓';
+                cellEl.classList.remove('flag');
+                cellEl.classList.add('question');
+                flagsPlaced--;
+            } else {
+                cellData.flagged = 0;
+                cellEl.innerText = '';
+                cellEl.classList.remove('question');
+            }
+
+            minesCountElement.innerText = config.mines - flagsPlaced;
+        }
+
+        function revealCell(r, c) {
+            const cellData = grid[r][c];
+            if (cellData.revealed || cellData.flagged === 1) return;
+
+            cellData.revealed = true;
+            cellData.element.classList.add('revealed');
+            
+            if (cellData.flagged === 2) { 
+                cellData.element.innerText = '';
+                cellData.element.classList.remove('question');
+                cellData.flagged = 0;
+            }
+
+            if (cellData.neighborMines > 0) {
+                cellData.element.innerText = cellData.neighborMines;
+                cellData.element.classList.add(`c${cellData.neighborMines}`);
+            } else {
+                for (let i = -1; i <= 1; i++) {
+                    for (let j = -1; j <= 1; j++) {
+                        const nr = r + i;
+                        const nc = c + j;
+                        if (nr >= 0 && nr < config.rows && nc >= 0 && nc < config.cols) {
+                            revealCell(nr, nc);
+                        }
+                    }
+                }
+            }
+        }
+
+        function updateProgress() {
+            let revealedCount = 0;
+            for (let r = 0; r < config.rows; r++) {
+                for (let c = 0; c < config.cols; c++) {
+                    if (grid[r][c].revealed) revealedCount++;
+                }
+            }
+
+            const percentage = Math.floor((revealedCount / totalSafeCells) * 100);
+            progressBar.style.width = `${percentage}%`;
+            progressText.innerText = `${revealedCount} / ${totalSafeCells} (${percentage}%)`;
+
+            if (revealedCount === totalSafeCells) {
+                gameOver(true);
+            }
+        }
+
+        function startTimer() {
+            timer = setInterval(() => {
+                timeElapsed++;
+                timerElement.innerText = timeElapsed;
+            }, 1000);
+        }
+
+        function gameOver(win) {
+            isGameOver = true;
+            clearInterval(timer);
+
+            if (win) {
+                progressBar.style.width = '100%';
+                progressBar.style.backgroundColor = '#2196F3'; // Μπλε για νίκη
+                setTimeout(() => alert(`Συγχαρητήρια! Κέρδισες σε ${timeElapsed} δευτερόλεπτα! 🎉`), 20);
+            } else {
+                for (let r = 0; r < config.rows; r++) {
+                    for (let c = 0; c < config.cols; c++) {
+                        const current = grid[r][c];
+                        if (current.isMine) {
+                            current.element.classList.add('revealed', 'mine');
+                            current.element.innerText = '💣';
+                        }
+                        if (!current.isMine && current.flagged === 1) {
+                            current.element.innerText = '❌';
+                        }
+                    }
+                }
+                progressBar.style.backgroundColor = '#e74c3c'; // Κόκκινο για ήττα
+                setTimeout(() => alert("Έχασες! Πάτησες νάρκη 💥"), 20);
+            }
+        }
+
+        // --- ΝΕΟ: Φόρτωση αποθηκευμένης δυσκολίας ---
+        // Διαβάζουμε το LocalStorage πριν ξεκινήσει το πρώτο παιχνίδι
+        const savedLevel = localStorage.getItem('minesweeper-level');
+        if (savedLevel && difficulties[savedLevel]) {
+            difficultySelect.value = savedLevel;
+        }
+
+        startGame();
+
+    </script>
+</body>
+</html>
