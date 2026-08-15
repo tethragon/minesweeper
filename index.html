@@ -57,6 +57,68 @@
             stroke: #222;
         }
 
+        .board-container {
+            display: flex;
+            flex-direction: row;
+            gap: 25px;
+            align-items: flex-start;
+            justify-content: center;
+            margin-top: 5px;
+            width: 100%;
+            max-width: 1000px;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .scoreboard {
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            min-width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-sizing: border-box;
+        }
+
+        .scoreboard h2 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #333;
+            text-align: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .score-stat {
+            display: flex;
+            justify-content: space-between;
+            font-size: 15px;
+            color: #555;
+            font-weight: bold;
+        }
+
+        .score-val {
+            color: #2196F3;
+            font-size: 16px;
+        }
+
+        .score-val.win-val { color: #4CAF50; }
+        .score-val.loss-val { color: #e74c3c; }
+
+        @media (max-width: 768px) {
+            .board-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .scoreboard {
+                width: 100%;
+                max-width: 450px;
+                margin-bottom: 15px;
+            }
+        }
+
         .controls {
             margin-bottom: 15px;
             display: flex;
@@ -329,7 +391,18 @@
         </div>
     </div>
 
-    <div id="game-board" oncontextmenu="return false;"></div>
+    <div class="board-container">
+        <!-- Scoreboard -->
+        <aside class="scoreboard">
+            <h2 id="lbl-scoreboard">📊 Στατιστικά</h2>
+            <div class="score-stat"><span id="lbl-played">Παιχνίδια:</span> <span id="stat-played" class="score-val">0</span></div>
+            <div class="score-stat"><span id="lbl-won">Νίκες:</span> <span id="stat-won" class="score-val win-val">0</span></div>
+            <div class="score-stat"><span id="lbl-win-rate">Ποσοστό Νικών:</span> <span id="stat-win-rate" class="score-val win-val">0%</span></div>
+            <div class="score-stat"><span id="lbl-loss-rate">Ποσοστό Ηττών:</span> <span id="stat-loss-rate" class="score-val loss-val">0%</span></div>
+        </aside>
+
+        <div id="game-board" oncontextmenu="return false;"></div>
+    </div>
 
     <!-- Modal Ρυθμίσεων -->
     <div id="settings-modal" class="modal-overlay" onclick="closeSettingsOutside(event)">
@@ -340,7 +413,7 @@
             <div class="version">
                 Minesweeper
                 <!-- --- ΕΚΔΟΣΗ (VERSION) START --- -->
-                v3.3
+                v4
                 <!-- --- ΕΚΔΟΣΗ (VERSION) END --- -->
             </div>
 
@@ -372,7 +445,12 @@
                 modalTitle: "Ρυθμίσεις / Πληροφορίες",
                 btnClose: "Κλείσιμο",
                 winMsg: "Συγχαρητήρια! Κέρδισες σε {time} δευτερόλεπτα! 🎉",
-                loseMsg: "Έχασες! Πάτησες νάρκη 💥"
+                loseMsg: "Έχασες! Πάτησες νάρκη 💥",
+                lblScoreboard: "📊 Στατιστικά",
+                lblPlayed: "Παιχνίδια:",
+                lblWon: "Νίκες:",
+                lblWinRate: "Ποσοστό Νικών:",
+                lblLossRate: "Ποσοστό Ηττών:"
             },
             en: {
                 title: "💣 Minesweeper",
@@ -390,7 +468,12 @@
                 modalTitle: "Settings / Info",
                 btnClose: "Close",
                 winMsg: "Congratulations! You won in {time} seconds! 🎉",
-                loseMsg: "You lost! You hit a mine 💥"
+                loseMsg: "You lost! You hit a mine 💥",
+                lblScoreboard: "📊 Scoreboard",
+                lblPlayed: "Games Played:",
+                lblWon: "Wins:",
+                lblWinRate: "Win Rate:",
+                lblLossRate: "Loss Rate:"
             }
         };
 
@@ -424,6 +507,12 @@
             document.getElementById('modal-title').innerText = t.modalTitle;
             document.getElementById('btn-close').innerText = t.btnClose;
 
+            document.getElementById('lbl-scoreboard').innerText = t.lblScoreboard;
+            document.getElementById('lbl-played').innerText = t.lblPlayed;
+            document.getElementById('lbl-won').innerText = t.lblWon;
+            document.getElementById('lbl-win-rate').innerText = t.lblWinRate;
+            document.getElementById('lbl-loss-rate').innerText = t.lblLossRate;
+
             // Ενημέρωση active σημαίας
             document.getElementById('flag-el').classList.remove('active');
             document.getElementById('flag-en').classList.remove('active');
@@ -443,6 +532,18 @@
         const difficultySelect = document.getElementById('difficulty');
         const progressBar = document.getElementById('progress-bar');
         const progressText = document.getElementById('progress-text-val');
+
+        let sessionGamesPlayed = 0;
+        let sessionGamesWon = 0;
+
+        function updateScoreboard() {
+            document.getElementById('stat-played').innerText = sessionGamesPlayed;
+            document.getElementById('stat-won').innerText = sessionGamesWon;
+            const winRate = sessionGamesPlayed > 0 ? Math.round((sessionGamesWon / sessionGamesPlayed) * 100) : 0;
+            const lossRate = sessionGamesPlayed > 0 ? 100 - winRate : 0;
+            document.getElementById('stat-win-rate').innerText = `${winRate}%`;
+            document.getElementById('stat-loss-rate').innerText = `${lossRate}%`;
+        }
 
         let grid = [];
         let config = {};
@@ -607,6 +708,11 @@
         function gameOver(win) {
             isGameOver = true;
             clearInterval(timer);
+            
+            sessionGamesPlayed++;
+            if (win) sessionGamesWon++;
+            updateScoreboard();
+
             const msg = win 
                 ? translations[currentLang].winMsg.replace('{time}', timeElapsed) 
                 : translations[currentLang].loseMsg;
@@ -632,7 +738,9 @@
         }
 
         function revealRandomCells() {
-            if (isGameOver) return;
+            if (isGameOver) {
+                startGame();
+            }
             const numToReveal = parseInt(document.getElementById('randomCount').value);
             
             for (let i = 0; i < numToReveal; i++) {
