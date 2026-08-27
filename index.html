@@ -413,7 +413,7 @@
             <div class="version">
                 Minesweeper
                 <!-- --- ΕΚΔΟΣΗ (VERSION) START --- -->
-                v4
+                v4.1.20260827
                 <!-- --- ΕΚΔΟΣΗ (VERSION) END --- -->
             </div>
 
@@ -593,10 +593,14 @@
                     const cell = document.createElement('div');
                     cell.classList.add('cell');
                     
-                    cell.addEventListener('click', () => handleClick(r, c));
+                    cell.addEventListener('click', (e) => {
+                        if (e.button === 0) handleClick(r, c);
+                    });
+                    cell.addEventListener('mousedown', (e) => {
+                        if (e.button === 2) handleRightClick(r, c);
+                    });
                     cell.addEventListener('contextmenu', (e) => {
                         e.preventDefault(); 
-                        handleRightClick(r, c);
                     });
 
                     boardElement.appendChild(cell);
@@ -647,7 +651,13 @@
             else { revealCell(r, c); updateProgress(); }
         }
 
+        let lastRightClickTime = 0;
+
         function handleRightClick(r, c) {
+            const now = Date.now();
+            if (now - lastRightClickTime < 150) return; // Αποτροπή πολλαπλών events όταν κρατιέται το πλήκτρο (Debounce)
+            lastRightClickTime = now;
+
             if (isGameOver || grid[r][c].revealed) return;
             const cellData = grid[r][c];
             const cellEl = cellData.element;
